@@ -1,11 +1,11 @@
 package com.repomanage.muti_repo_plugin
 
+import com.google.gson.Gson
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.ProjectEvaluationListener
 import org.gradle.api.ProjectState
 import org.gradle.api.initialization.Settings
-import org.gradle.internal.impldep.com.google.gson.Gson
 import java.io.File
 import java.io.FileReader
 
