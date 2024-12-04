@@ -20,5 +20,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "MutiRepo"
-include(":app")
+//include(":app")
 include(":muti_repo_plugin")
