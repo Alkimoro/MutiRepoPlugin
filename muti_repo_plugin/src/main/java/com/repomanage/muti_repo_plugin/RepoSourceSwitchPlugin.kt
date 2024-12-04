@@ -48,7 +48,7 @@ class RepoSourceSwitchPlugin : Plugin<Settings> {
     private fun processJsonConfig(settings: Settings): ConfigModel {
         var reader: FileReader? = null
         return try {
-            val file = File(settings.rootDir.absolutePath + File.pathSeparator + FILE_NAME)
+            val file = File(settings.rootDir.absolutePath + File.separator + FILE_NAME)
             "获取dependencies_source.json配置 path:${file.absolutePath}".print()
             if (!file.exists()) {
                 "根目录dependencies_source.json配置不存在，自动跳过源码切换".print()
