@@ -1,0 +1,57 @@
+initscript {
+    repositories {
+        mavenCentral()
+        maven { url "https://jitpack.io" }
+    }
+    dependencies {
+        classpath "com.github.Alkimoro:MutiRepoPlugin:0.8"
+        //classpath gradleApi()
+        //classpath 'com.google.code.gson:gson:2.11.0'
+    }
+}
+
+beforeSettings { settings ->
+    settings.apply plugin: com.repomanage.muti_repo_plugin.RepoSourceSwitchPlugin
+}
+
+afterProject { proj ->
+    if (proj.name == "app") {
+        def ext = proj.extensions.getByName("android")
+        ext.buildTypes.getByName("debug").debuggable = true
+        //kotlin 1.9.23
+        ext.defaultConfig.minSdkVersion = 24
+        println "minSdkVersion changed by init.gradle;new = ${ext.defaultConfig.minSdkVersion}"
+    }
+}
+
+settingsEvaluated { setting ->
+    setting.pluginManagement {
+        repositories {
+            gradlePluginPortal()
+        }
+        plugins {
+            //com.google.devtools.ksp:symbol-processing-gradle-plugin:1.9.23-1.0.19
+            id "com.google.devtools.ksp" version '1.9.23-1.0.19' apply false
+        }
+    }
+}
+
+
+rootProject {
+    buildscript {
+        dependencies {
+            classpath 'me.ele:lancet-plugin:1.0.6'
+        }
+    }
+}
+afterProject { proj ->
+    if (proj.name == "app") {
+        proj.apply plugin: 'me.ele.lancet'
+        proj.dependencies {
+            debugImplementation "com.bytedance.tools.codelocator:codelocator-core:2.0.4"
+
+            debugImplementation "com.bytedance.tools.codelocator:codelocator-lancet-all:2.0.4"
+            debugImplementation 'me.ele:lancet-base:1.0.6'
+        }
+    }
+}
