@@ -1,0 +1,36 @@
+./gradlew cleanBuildCache
+./gradlew clean build
+
+open -e ~/.zshrc
+
+chmod +x gradlew
+
+./gradlew :app:assembleXXXDebug
+./gradlew :app:assembleXXXDebug --no-build-cache
+./gradlew :app:assembleXXXDebug -PaabBuild=true
+./gradlew :app:assembleXXXDebug -PenableInitGradle=true
+
+./gradlew :app:assembleXXXRelease -PenableInitGradle=true
+
+./gradlew :app:assembleXXXDebug -PenableInitGradle=true
+
+./gradlew --stop
+
+sudo rm -rf ./app/build
+sudo rm -rf ./.gradle
+
+git push --tags
+
+./gradlew clean
+sudo rm -rf ~/.gradle/caches
+
+#global gradle config
+open -a 'Android Studio' ~/.gradle/gradle.properties
+open -a 'Android Studio' ~/.gradle/init.gradle
+
+
+
+flutter clean
+flutter pub cache repair
+flutter build web
+flutter run -d chrome

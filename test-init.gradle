@@ -1,3 +1,4 @@
+
 initscript {
     repositories {
         mavenCentral()
@@ -14,16 +15,6 @@ beforeSettings { settings ->
     settings.apply plugin: com.repomanage.muti_repo_plugin.RepoSourceSwitchPlugin
 }
 
-afterProject { proj ->
-    if (proj.name == "app") {
-        def ext = proj.extensions.getByName("android")
-        ext.buildTypes.getByName("debug").debuggable = true
-        //kotlin 1.9.23
-        ext.defaultConfig.minSdkVersion = 24
-        println "minSdkVersion changed by init.gradle;new = ${ext.defaultConfig.minSdkVersion}"
-    }
-}
-
 settingsEvaluated { setting ->
     setting.pluginManagement {
         repositories {
@@ -36,22 +27,170 @@ settingsEvaluated { setting ->
     }
 }
 
+beforeSettings { setting ->
+    def properties = new Properties()
+    file(setting.rootDir.absolutePath + File.separator + "local.properties").withInputStream { stream ->
+        properties.load(stream)
+    }
+    def enableInitGradle = this.gradle
+            .startParameter
+            .getProjectProperties()
+            .getOrDefault("enableInitGradle", "false")
+            .toBoolean() || properties.getProperty("enableInitGradle", "false").toBoolean()
+    if (!enableInitGradle) {
+        println "跳过init.gradle"
+        return
+    }
+    println "开始执行init.gradle"
 
-rootProject {
-    buildscript {
-        dependencies {
-            classpath 'me.ele:lancet-plugin:1.0.6'
+    def taskRequests = ""
+    try {
+        taskRequests = this.gradle.startParameter.taskRequests.get(0).getArgs().get(0)
+    } catch (e) {}
+    def isDebug = taskRequests.endsWith("Debug")
+    println "当前命令：$taskRequests, isDebug:$isDebug"
+
+
+    afterProject { proj ->
+        if (proj.name == "app") {
+            def ext = proj.extensions.getByName("android")
+            ext.buildTypes.getByName("debug").debuggable = true
+
+            println "release 开始注入release签名"
+            ext.signingConfigs {
+                release {
+                    storeFile file("/Users/sarry/StudioProjects/MboxGateApp/app_gateio_android/app/test.jks")
+                    storePassword "1234qwer"
+                    keyAlias "key0"
+                    keyPassword "1234qwer"
+                }
+            }
+            ext.buildTypes.getByName("release").setSigningConfig(ext.signingConfigs.release)
+            //kotlin 1.9.23
+            ext.defaultConfig.minSdkVersion = 24
+            println "minSdkVersion changed by init.gradle;new = ${ext.defaultConfig.minSdkVersion}"
+        }
+    }
+
+    if (isDebug) {
+        println "debug 环境，开始引入codelocator"
+        //https://github.com/bytedance/CodeLocator/tree/2.0.4
+        rootProject {
+            buildscript {
+                dependencies {
+                    //classpath 'com.bytedance.tools.lancet:lancet-plugin-asm9:1.0.1'
+                    //classpath 'me.ele:lancet-plugin:1.0.5'
+                    //classpath 'com.bytedance.tools.lancet:lancet-plugin-asm6:1.0.2'
+                    classpath 'com.github.mainlxl:lancet:6f4fa3f16a'
+                }
+            }
+        }
+        afterProject { proj ->
+            if (proj.name == "app") {
+                proj.apply plugin: 'me.ele.lancet'
+                proj.dependencies {
+                    debugImplementation "com.bytedance.tools.codelocator:codelocator-core:2.0.4"
+
+                    //debugImplementation "com.bytedance.tools.codelocator:codelocator-lancet-all:2.0.4"
+                    debugImplementation "com.bytedance.tools.codelocator:codelocator-lancet-activity:2.0.4"
+                    debugImplementation "com.bytedance.tools.codelocator:codelocator-lancet-view:2.0.4"
+                    debugImplementation "com.bytedance.tools.codelocator:codelocator-lancet-toast:2.0.4"
+                    debugImplementation "com.bytedance.tools.codelocator:codelocator-lancet-dialog:2.0.4"
+                    debugImplementation "com.bytedance.tools.codelocator:codelocator-lancet-popup:2.0.4"
+                    compileOnly 'me.ele:lancet-base:1.0.6'
+                }
+            }
         }
     }
 }
-afterProject { proj ->
-    if (proj.name == "app") {
-        proj.apply plugin: 'me.ele.lancet'
-        proj.dependencies {
-            debugImplementation "com.bytedance.tools.codelocator:codelocator-core:2.0.4"
 
-            debugImplementation "com.bytedance.tools.codelocator:codelocator-lancet-all:2.0.4"
-            debugImplementation 'me.ele:lancet-base:1.0.6'
-        }
-    }
-}
+
+//
+//import com.alibaba.fastjson.JSONArray
+//import com.alibaba.fastjson.JSONObject
+//
+//List<ModuleSource> list = loadDebugConfig()
+//
+//for (ModuleSource module : list) {
+//    if (module.debug) {
+//        include ":${module.moduleName}"
+//        //gradle8弃用了/xx/xx相对路径的形式，所以用使用$绝对路径
+//        project(":${module.moduleName}").projectDir = file("${module.sourceDir}")
+//        println("debug外部模块[:${module.moduleName}]，源码路径 ${module.sourceDir}")
+//    }
+//}
+//
+//if (list.size() > 0) {
+//    gradle.addProjectEvaluationListener(new ProjectEvaluationListener() {
+//        @Override
+//        void beforeEvaluate(Project projectObj) {
+//        }
+//
+//        @Override
+//        void afterEvaluate(Project projectObj, ProjectState state) {
+//            projectObj.configurations.all { config ->
+//                config.resolutionStrategy.dependencySubstitution {
+//                    for (ModuleSource ms : list) {
+//                        if (ms.debug) {
+//                            substitute module(ms.dependenceName) with project(":${ms.moduleName}")
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    })
+//}
+//
+//def loadDebugConfig() {
+//    List<ModuleSource> list = new ArrayList<>()
+//    String json = null
+//    try {
+//        json = file("debug_aar_config.json").getText()
+//    } catch (ignored) {
+//        println("根目录不存在debug_aar_config.json文件。(如果不需要debug aar源码忽略该信息)")
+//    }
+//    if (json == null) {
+//        return list
+//    }
+//
+//    //解析debug_source_config.json中的字段
+//    JSONArray jsonArray = (JSONArray) JSONObject.parse(json)
+//    for (int i = 0; i < jsonArray.size(); i++) {
+//        JSONObject ob = (JSONObject) jsonArray.get(i)
+//        boolean isDebug = ob.getBoolean("debug")
+//        String moduleName = ob.getString("module_name")
+//        String sourceDir = ob.getString("source_dir")
+//        String dependenceName = ob.getString("dependence_name")
+//        if (moduleName == null || sourceDir == null || dependenceName == null) {
+//            println("数据[${moduleName},${sourceDir},${dependenceName}]异常，该配置被忽略!!")
+//            continue
+//        }
+//        list.add(new ModuleSource(isDebug, moduleName, sourceDir, dependenceName))
+//    }
+//    return list
+//}
+//
+//class ModuleSource {
+//
+//    /**是否调试aar*/
+//    boolean debug = false
+//
+//    /**引入module名字*/
+//    String moduleName = null
+//
+//    /**
+//     * aar依赖，去掉版本号，例如引入aar依赖com.google.code.gson:gson:2.8.5
+//     * 则dependenceName为com.google.code.gson:gson
+//     */
+//    String dependenceName = null
+//
+//    /**绝对路径*/
+//    String sourceDir = null
+//
+//    ModuleSource(boolean debug, String moduleName, String sourceDir, String dependenceName) {
+//        this.debug = debug
+//        this.moduleName = moduleName
+//        this.dependenceName = dependenceName
+//        this.sourceDir = sourceDir
+//    }
+//}
