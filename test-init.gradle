@@ -15,33 +15,19 @@ beforeSettings { settings ->
     settings.apply plugin: com.repomanage.muti_repo_plugin.RepoSourceSwitchPlugin
 }
 
-settingsEvaluated { setting ->
-    setting.pluginManagement {
-        repositories {
-            gradlePluginPortal()
-        }
-        plugins {
-            //com.google.devtools.ksp:symbol-processing-gradle-plugin:1.9.23-1.0.19
-            id "com.google.devtools.ksp" version '1.9.23-1.0.19' apply false
-        }
-    }
-}
+//settingsEvaluated { setting ->
+//    setting.pluginManagement {
+//        repositories {
+//            gradlePluginPortal()
+//        }
+//        plugins {
+//            //com.google.devtools.ksp:symbol-processing-gradle-plugin:1.9.23-1.0.19
+//            id "com.google.devtools.ksp" version '1.9.25-1.0.20' apply false
+//        }
+//    }
+//}
 
 beforeSettings { setting ->
-    def properties = new Properties()
-    file(setting.rootDir.absolutePath + File.separator + "local.properties").withInputStream { stream ->
-        properties.load(stream)
-    }
-    def enableInitGradle = this.gradle
-            .startParameter
-            .getProjectProperties()
-            .getOrDefault("enableInitGradle", "false")
-            .toBoolean() || properties.getProperty("enableInitGradle", "false").toBoolean()
-    if (!enableInitGradle) {
-        println "跳过init.gradle"
-        return
-    }
-    println "开始执行init.gradle"
 
     def taskRequests = ""
     try {
@@ -50,6 +36,48 @@ beforeSettings { setting ->
     def isDebug = taskRequests.endsWith("Debug")
     println "当前命令：$taskRequests, isDebug:$isDebug"
 
+    def properties = new Properties()
+    file(setting.rootDir.absolutePath + File.separator + "local.properties").withInputStream { stream ->
+        properties.load(stream)
+    }
+    def enableInitGradle = this.gradle
+            .startParameter
+            .getProjectProperties()
+            .getOrDefault("enableInitGradle", "false")
+            .toBoolean() || (properties.getProperty("enableInitGradleDebug", "false").toBoolean() && isDebug)
+
+    //ReferCheck Plugin
+    def enableReferCheck = this.gradle
+            .startParameter
+            .getProjectProperties()
+            .getOrDefault("enableReferCheck", "false")
+            .toBoolean()
+    println "ReferCheck Plugin: enableReferCheck=$enableReferCheck"
+    if (enableReferCheck) {
+        rootProject {
+            buildscript {
+                dependencies {
+                    def third_bytex_version = '0.6.0-rc.6'
+                    classpath "com.github.Alkimoro.bytex:base-plugin:${third_bytex_version}"
+                    classpath "com.github.Alkimoro.bytex:refer-check-plugin:${third_bytex_version}"
+                }
+            }
+        }
+    }
+    afterProject { proj ->
+        if (proj.name == "app" && enableReferCheck) {
+            def ext = proj.extensions.getByName("android")
+            ext.defaultConfig.minSdkVersion = 24
+            proj.apply from: "./../bytex_plugin_config.gradle"
+        }
+    }
+
+
+    if (!enableInitGradle) {
+        println "跳过init.gradle"
+        return
+    }
+    println "开始执行init.gradle"
 
     afterProject { proj ->
         if (proj.name == "app") {
